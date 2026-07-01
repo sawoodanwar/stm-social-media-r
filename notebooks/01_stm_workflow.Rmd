@@ -1,0 +1,70 @@
+---
+title: "STM Workflow for Social Media Text Analysis"
+output: html_document
+---
+
+## Setup
+
+```{r setup, message=FALSE}
+library(quanteda)
+library(stm)
+library(dplyr)
+library(readr)
+library(ggplot2)
+```
+
+## Load sample data
+
+```{r}
+df <- read_csv(here::here("data", "sample", "sample_posts.csv"))
+head(df)
+```
+
+## Clean text
+
+```{r}
+clean_text <- function(text) {
+  text <- tolower(text)
+  text <- gsub("http\\S+|www\\S+", "", text)
+  text <- gsub("@\\w+", "", text)
+  text <- gsub("#", "", text)
+  text <- gsub("[^a-z\\s]", " ", text)
+  text <- gsub("\\s+", " ", text)
+  trimws(text)
+}
+
+df$clean_text <- sapply(df$text, clean_text)
+```
+
+## Build corpus and DFM
+
+```{r}
+corp <- corpus(df, text_field = "clean_text", docid_field = "id")
+toks <- tokens(corp, remove_punct = TRUE, remove_numbers = TRUE) %>%
+  tokens_remove(stopwords("en")) %>%
+  tokens_wordstem()
+
+dfmat <- dfm(toks)
+stm_input <- convert(dfmat, to = "stm")
+```
+
+## Fit STM model
+
+```{r}
+k <- 5
+stm_model <- stm(
+  documents = stm_input$documents,
+  vocab = stm_input$vocab,
+  K = k,
+  data = stm_input$meta,
+  init.type = "Spectral"
+)
+
+labelTopics(stm_model)
+```
+
+## Plot topic prevalence
+
+```{r}
+plot(stm_model, type = "summary")
+```
